@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "JLC Stock",
+    "version": "0.1",
+    "description": "A tool to present JLC stock quantities on electrical component websites like Digikey",
+
+    "content_scripts": [
+        {
+            "js": ["scripts/content.js"],
+            "matches": [
+                "https://www.digikey.com/en/products/filter/*"
+            ]
+        }
+    ]
+}

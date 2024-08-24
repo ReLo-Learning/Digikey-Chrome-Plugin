@@ -1,5 +1,7 @@
 const dataURL = "https://yaqwsx.github.io/jlcparts/data/index.json"
 
+let data = {}
+
 async function getData()
 {
     await fetch(dataURL)
@@ -23,36 +25,48 @@ async function getData()
                     request.onerror = () => {
                         console.log("ERROR")
                     }
-                    request.onsuccess = (e) => {
+                    request.onsuccess = async (e) => {
                         console.log("Success")
                         var db = e.target.result
-                        transaction = db.transaction("PartStore", "readwrite")
-                        store = transaction.objectStore("PartStore") 
-                        
-                        transaction.oncomplete = () => {
-                            console.log("Population transaction complete")
-                        }
 
                         const categories = res["categories"]
-    
+
+                        const len = Object.keys(categories).length
+                        
+                        let i = 0
                         for (const [key, value] of Object.entries(categories))
                         {
+                            i += 1;
                             for(const [k, v] of Object.entries(categories[key]))
                             {
-                                populateDB(v["sourcename"], store)
+                                await populateDB(v["sourcename"])
                             }
+
+                            console.log(i, "/", len);
+                        }
+
+                        var transaction = db.transaction("PartStore", "readwrite")
+                        var store = transaction.objectStore("PartStore")
+
+                        transaction.oncomplete = () => {console.log("Database Filled")}
+
+                        for (const [key, value] of Object.entries(data))
+                        {
+                            store.put({part: key, quantity: value})
                         }
                     }
 
                 })
                 .catch(e => console.error(e))
+
 }
 
-async function populateDB(category, store)
+async function populateDB(category)
 {
+    // console.log("Starting", category)
     const stock = await fetch(`https://yaqwsx.github.io/jlcparts/data/${category}.stock.json`)
                             .then(res => res.json())
-                            .catch(e => console.error(e))
+                            .catch(e => {console.error(e); return})
     
     const mfg = await fetch(`https://yaqwsx.github.io/jlcparts/data/${category}.json.gz`)
                             .then(async res => {
@@ -60,24 +74,23 @@ async function populateDB(category, store)
                                 
                                 const blob = await res.blob()
                                 const stream = blob.stream().pipeThrough(ds)
-                                const out = await new Response(stream);
+                                const out = new Response(stream);
                                 return await out.json()
                             })
-                            .catch(e => console.error(e))
+                            .catch(e => {console.error(e); return;})
     
-        for (const [key, qty] of Object.entries(stock))
+    for (const idx in mfg["components"])
+    {
+        const component = mfg["components"][idx]
+        if (stock[component[0]])
         {
-            for (const idx in mfg["components"])
-            {
-                const component = mfg["components"][idx]
-                if (key == component[0])
-                {
-                    store.put({part: component[1], quantity: qty})
-                    break;
-                }
-        
-            }
-        }    
+            data[component[1]] = stock[component[0]]
+            // store.put({part: component[1], quantity: qty})
+        }
+
+    }
+
+    // console.log(category, Object.keys(data).length)
 }
 
 function renderContent()
